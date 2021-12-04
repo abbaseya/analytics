@@ -11,6 +11,7 @@ Plausible helper tools v$VERSION
 
 COMMANDS:
 up            Run containers
+serve         Start Plausible
 down          Stop containers
 
 OPTIONS:
@@ -37,6 +38,10 @@ up()
     make postgres
     make clickhouse
     make pgadmin
+}
+
+serve()
+{
     make server &> plausible.log &
 }
 
@@ -70,6 +75,9 @@ down()
 case $CMD in
     up)
         up
+        ;;
+    serve)
+        serve
         ;;
     down)
         down
