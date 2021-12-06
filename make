@@ -38,6 +38,7 @@ up()
     make postgres
     make clickhouse
     make pgadmin
+    docker inspect plausible_db | grep IPAddress
 }
 
 serve()
