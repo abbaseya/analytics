@@ -80,6 +80,7 @@ defmodule PlausibleWeb.Router do
     get "/aggregate", ExternalStatsController, :aggregate
     get "/breakdown", ExternalStatsController, :breakdown
     get "/timeseries", ExternalStatsController, :timeseries
+    get "/property/:prop_name", ExternalStatsController, :prop_breakdown
   end
 
   scope "/api/v1/sites", PlausibleWeb.Api do

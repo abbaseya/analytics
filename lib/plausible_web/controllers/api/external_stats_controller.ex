@@ -2,7 +2,8 @@ defmodule PlausibleWeb.Api.ExternalStatsController do
   use PlausibleWeb, :controller
   use Plausible.Repo
   use Plug.ErrorHandler
-  alias Plausible.Stats.Query
+  alias Plausible.Stats
+  alias Plausible.Stats.{Query, Filters}
 
   def realtime_visitors(conn, _params) do
     site = conn.assigns[:site]
@@ -144,8 +145,60 @@ defmodule PlausibleWeb.Api.ExternalStatsController do
     end
   end
 
+  defp calculate_cr(nil, _converted_visitors), do: 100.0
+
+  defp calculate_cr(unique_visitors, converted_visitors) do
+    if unique_visitors > 0,
+      do: Float.round(converted_visitors / unique_visitors * 100, 1),
+      else: 0.0
+  end
+
+  def prop_breakdown(conn, params) do
+    site = conn.assigns[:site]
+    query = Query.from(site.timezone, params) |> Filters.add_prefix()
+    pagination = parse_pagination(params)
+
+    total_q = Query.remove_goal(query)
+
+    %{"visitors" => %{"value" => unique_visitors}} = Stats.aggregate(site, total_q, ["visitors"])
+
+    prop_name = "event:props:" <> params["prop_name"]
+
+    props =
+      Stats.breakdown(site, query, prop_name, ["visitors", "events"], pagination)
+      |> transform_keys(%{
+        params["prop_name"] => "name",
+        "events" => "total_conversions",
+        "visitors" => "unique_conversions"
+      })
+      |> Enum.map(fn prop ->
+        Map.put(
+          prop,
+          "conversion_rate",
+          calculate_cr(unique_visitors, prop["unique_conversions"])
+        )
+      end)
+
+    json(conn, props)
+  end
+
   def handle_errors(conn, %{kind: kind, reason: reason}) do
     json(conn, %{error: Exception.format_banner(kind, reason)})
+  end
+
+  defp transform_keys(results, keys_to_replace) do
+    Enum.map(results, fn map ->
+      Enum.map(map, fn {key, val} ->
+        {Map.get(keys_to_replace, key, key), val}
+      end)
+      |> Enum.into(%{})
+    end)
+  end
+
+  defp parse_pagination(params) do
+    limit = if params["limit"], do: String.to_integer(params["limit"]), else: 9
+    page = if params["page"], do: String.to_integer(params["page"]), else: 1
+    {limit, page}
   end
 
   defp percent_change(old_count, new_count) do
